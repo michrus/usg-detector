@@ -14,11 +14,12 @@ from third_party.pytorch_unet.utils.dataset import BasicDataset
 def predict_img(net,
                 full_img,
                 device,
-                scale_factor=1,
+                img_width=0,
+                img_height=0,
                 out_threshold=0.5):
     net.eval()
 
-    img = torch.from_numpy(BasicDataset.preprocess(full_img, scale_factor))
+    img = torch.from_numpy(BasicDataset.preprocess(full_img, img_width, img_height))
 
     img = img.unsqueeze(0)
     img = img.to(device=device, dtype=torch.float32)
@@ -54,9 +55,8 @@ if __name__ == "__main__":
     parser.add_argument('--mask-threshold', '-t', type=float,
                         help="Minimum probability value to consider a mask pixel white",
                         default=0.5)
-    parser.add_argument('--scale', '-s', type=float,
-                        help="Scale factor for the input images",
-                        default=0.5)
+    parser.add_argument('-r', '--resize', dest='resize_string', type=str,
+                        help='Size images should be resized to, in format: NxM. Example: 24x24')
 
     args = parser.parse_args()
     in_file = args.input
@@ -68,14 +68,22 @@ if __name__ == "__main__":
 
     net.to(device=device)
     state_dict = torch.load(args.model, map_location=device)
-    # print(state_dict.get("inc.double_conv.0.weight").size())
     net.load_state_dict(state_dict)
 
     img = Image.open(in_file)
 
+    if args.resize_string:
+        resize = list(map(int, args.resize_string.split("x")))
+        img_width = resize[0]
+        img_height = resize[1]
+    else:
+        img_width = 0
+        img_height = 0
+
     mask = predict_img(net=net,
                         full_img=img,
-                        scale_factor=args.scale,
+                        img_width=img_width,
+                        img_height=img_height,
                         out_threshold=args.mask_threshold,
                         device=device)
 
