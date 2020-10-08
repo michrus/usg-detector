@@ -1,9 +1,10 @@
 import argparse
-import os
-os.environ["PYTORCH_JIT"] = "0"
+import numpy as np
 import torch
+import matplotlib.pyplot as plt
 from PIL import Image
 from torchvision import transforms
+import matplotlib.patches as mpatches
 import operator
 from skimage.measure import label, regionprops
 
@@ -50,7 +51,9 @@ if __name__ == "__main__":
                         metavar='FILE',
                         help="Specify the file in which the model is stored")
     parser.add_argument('--input', '-i', metavar='INPUT',
-                        help='filename of input images', required=True)
+                        help='filename of input image', required=True)
+    parser.add_argument('--output', '-o', metavar='OUTPUT',
+                        help='filename of output image (should be .png)', required=True)
     parser.add_argument('--mask-threshold', '-t', type=float,
                         help="Minimum probability value to consider a mask pixel white",
                         default=0.5)
@@ -67,11 +70,9 @@ if __name__ == "__main__":
     device = "cpu"
 
     net.to(device=device)
-    state_dict = torch.load(args.model, map_location=device)
-    # print(state_dict.get("inc.double_conv.0.weight").size())
-    net.load_state_dict(state_dict)
+    net.load_state_dict(torch.load(args.model, map_location=device))
 
-    img = Image.open(in_file)
+    img = Image.open(in_file)#.convert("RGB")
 
     mask = predict_img(net=net,
                         full_img=img,
@@ -79,11 +80,20 @@ if __name__ == "__main__":
                         out_threshold=args.mask_threshold,
                         device=device)
 
+    image = np.array(img)
     # label image regions
     label_image = label(mask)
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.imshow(image)
     
     regps = regionprops(label_image)
     max_region = max(regps, key=operator.attrgetter("area"))
     miny, minx, maxy, maxx = max_region.bbox
+    rect = mpatches.Rectangle((minx, miny), maxx - minx, maxy - miny,
+                            fill=False, edgecolor='red', linewidth=1)
+    ax.add_patch(rect)
 
-    print(f"{minx},{miny},{maxx},{maxy}")
+    ax.set_axis_off()
+    plt.tight_layout()
+    plt.savefig(args.output)
