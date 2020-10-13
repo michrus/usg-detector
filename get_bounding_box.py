@@ -58,13 +58,15 @@ if __name__ == "__main__":
     parser.add_argument('--mask-threshold', '-t', type=float,
                         help="Minimum probability value to consider a mask pixel white",
                         default=0.5)
+    parser.add_argument('-s', '--scale', dest='scale', type=float, default=0.5,
+                        help='Downscaling factor of the images. Takes priority over resize')
     parser.add_argument('-r', '--resize', dest='resize_string', type=str,
                         help='Size images should be resized to, in format: NxM. Example: 24x24')
 
     args = parser.parse_args()
     in_file = args.input
 
-    net = UNet(n_channels=3, n_classes=1)
+    net = UNet(n_channels=1, n_classes=1)
 
     #device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     device = "cpu"
@@ -77,7 +79,9 @@ if __name__ == "__main__":
     if args.resize_string:
         resize = list(map(int, args.resize_string.split("x")))
         img_width = resize[0]
+        width_ratio = img_width/img.size[0]
         img_height = resize[1]
+        height_ratio = img_height/img.size[1]
     else:
         img_width = 0
         img_height = 0
