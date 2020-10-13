@@ -17,10 +17,11 @@ def predict_img(net,
                 device,
                 img_width=0,
                 img_height=0,
+                img_scale=1.0,
                 out_threshold=0.5):
     net.eval()
 
-    img = torch.from_numpy(BasicDataset.preprocess(full_img, img_width, img_height))
+    img = torch.from_numpy(BasicDataset.preprocess(full_img, img_width, img_height, img_scale))
 
     img = img.unsqueeze(0)
     img = img.to(device=device, dtype=torch.float32)
@@ -90,6 +91,7 @@ if __name__ == "__main__":
                         full_img=img,
                         img_width=img_width,
                         img_height=img_height,
+                        img_scale=args.scale,
                         out_threshold=args.mask_threshold,
                         device=device)
 
