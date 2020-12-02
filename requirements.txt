@@ -1,4 +1,7 @@
-torch
-torchvision
-scipy 
-scikit-image
+-f https://download.pytorch.org/whl/torch_stable.html
+torch==1.3.1+cpu
+torchvision==0.4.2+cpu
+
+scipy==1.4.1 
+scikit-image==0.16.2
+pyinstaller
