@@ -64,9 +64,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     in_file = args.input
 
-    net = UNet(n_channels=1, n_classes=1)
+    net = UNet(n_channels=3, n_classes=1)
 
-    #device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     device = "cpu"
 
     net.to(device=device)
