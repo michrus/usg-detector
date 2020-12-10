@@ -17,10 +17,13 @@ def predict_img(net,
                 img_width=0,
                 img_height=0,
                 img_scale=1.0,
-                out_threshold=0.5):
+                out_threshold=0.5,
+                dataset_mean=None,
+                dataset_std=None):
     net.eval()
 
-    img = torch.from_numpy(BasicDataset.preprocess(full_img, img_width, img_height, img_scale))
+    img = torch.from_numpy(BasicDataset.preprocess(full_img, img_width, img_height, img_scale
+                                                   dataset_mean, dataset_std))
 
     img = img.unsqueeze(0)
     img = img.to(device=device, dtype=torch.float32)
@@ -72,6 +75,11 @@ if __name__ == "__main__":
     state_dict = torch.load(args.model, map_location=device)
     net.load_state_dict(state_dict)
 
+    # Get image standardization parameters
+    mean_std_dict = BasicDataset.get_dataset_mean_std([in_file])
+    dataset_mean = mean_std_dict.get("mean")
+    dataset_std = mean_std_dict.get("std")
+
     img = Image.open(in_file)
 
     if args.resize_string:
@@ -88,7 +96,9 @@ if __name__ == "__main__":
                         img_height=img_height,
                         img_scale=args.scale,
                         out_threshold=args.mask_threshold,
-                        device=device)
+                        device=device,
+                        dataset_mean=dataset_mean,
+                        dataset_std=dataset_std)
 
     # label image regions
     label_image = label(mask)
