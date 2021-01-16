@@ -18,11 +18,12 @@ def predict_img(net,
                 img_height=0,
                 img_scale=1.0,
                 out_threshold=0.5,
+                use_bw=False,
                 dataset_mean=None,
                 dataset_std=None):
     net.eval()
 
-    img = torch.from_numpy(BasicDataset.preprocess(full_img, img_width, img_height, img_scale
+    img = torch.from_numpy(BasicDataset.preprocess(full_img, img_width, img_height, img_scale, use_bw,
                                                    dataset_mean, dataset_std))
 
     img = img.unsqueeze(0)
@@ -63,24 +64,23 @@ if __name__ == "__main__":
                         help='Downscaling factor of the images. Takes priority over resize')
     parser.add_argument('-r', '--resize', dest='resize_string', type=str,
                         help='Size images should be resized to, in format: NxM. Example: 24x24')
+    parser.add_argument('--bw', dest='use_bw', action='store_true',
+                        help='Use black-white images')
 
     args = parser.parse_args()
     in_file = args.input
 
-    net = UNet(n_channels=3, n_classes=1)
+    if args.use_bw:
+        n_channels = 1
+    else:
+        n_channels = 3
+    net = UNet(n_channels=n_channels, n_classes=1)
 
     device = "cpu"
 
     net.to(device=device)
     state_dict = torch.load(args.model, map_location=device)
     net.load_state_dict(state_dict)
-
-    # Get image standardization parameters
-    mean_std_dict = BasicDataset.get_dataset_mean_std([in_file])
-    dataset_mean = mean_std_dict.get("mean")
-    dataset_std = mean_std_dict.get("std")
-
-    img = Image.open(in_file)
 
     if args.resize_string:
         resize = list(map(int, args.resize_string.split("x")))
@@ -89,6 +89,17 @@ if __name__ == "__main__":
     else:
         img_width = 0
         img_height = 0
+
+    # Get image standardization parameters
+    mean_std_dict = BasicDataset.get_dataset_mean_std([in_file], 
+                                                      img_width, 
+                                                      img_height, 
+                                                      args.scale, 
+                                                      use_bw=args.use_bw)
+    dataset_mean = mean_std_dict.get("mean")
+    dataset_std = mean_std_dict.get("std")
+
+    img = Image.open(in_file)
 
     mask = predict_img(net=net,
                         full_img=img,
