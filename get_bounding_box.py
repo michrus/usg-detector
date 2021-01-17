@@ -18,10 +18,14 @@ def predict_img(net,
                 img_width=0,
                 img_height=0,
                 img_scale=1.0,
-                out_threshold=0.5):
+                out_threshold=0.5,
+                use_bw=False,
+                dataset_mean=None,
+                dataset_std=None):
     net.eval()
 
-    img = torch.from_numpy(BasicDataset.preprocess(full_img, img_width, img_height, img_scale))
+    img = torch.from_numpy(BasicDataset.preprocess(full_img, img_width, img_height, img_scale, use_bw,
+                                                   dataset_mean, dataset_std))
 
     img = img.unsqueeze(0)
     img = img.to(device=device, dtype=torch.float32)
@@ -53,39 +57,58 @@ if __name__ == "__main__":
                         metavar='FILE',
                         help="Specify the file in which the model is stored")
     parser.add_argument('--input', '-i', metavar='INPUT',
-                        help='filename of input image', required=True)
+                        help='filename of input images', required=True)
     parser.add_argument('--output', '-o', metavar='OUTPUT',
                         help='filename of output image (should be .png)', required=True)
     parser.add_argument('--mask-threshold', '-t', type=float,
                         help="Minimum probability value to consider a mask pixel white",
                         default=0.5)
-    parser.add_argument('-s', '--scale', dest='scale', type=float, default=0.5,
+    parser.add_argument('-s', '--scale', dest='scale', type=float, default=1.0,
                         help='Downscaling factor of the images. Takes priority over resize')
     parser.add_argument('-r', '--resize', dest='resize_string', type=str,
                         help='Size images should be resized to, in format: NxM. Example: 24x24')
+    parser.add_argument('--bw', dest='use_bw', action='store_true',
+                        help='Use black-white images')
+    parser.add_argument('--standardize', dest='standardize', action='store_true',
+                        help='Standardize images based on dataset mean and std values')
 
     args = parser.parse_args()
     in_file = args.input
 
-    net = UNet(n_channels=1, n_classes=1)
+    if args.use_bw:
+        n_channels = 1
+    else:
+        n_channels = 3
+    net = UNet(n_channels=n_channels, n_classes=1)
 
-    #device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     device = "cpu"
 
     net.to(device=device)
-    net.load_state_dict(torch.load(args.model, map_location=device))
-
-    img = Image.open(in_file)#.convert("RGB")
+    state_dict = torch.load(args.model, map_location=device)
+    net.load_state_dict(state_dict)
 
     if args.resize_string:
         resize = list(map(int, args.resize_string.split("x")))
         img_width = resize[0]
-        width_ratio = img_width/img.size[0]
         img_height = resize[1]
-        height_ratio = img_height/img.size[1]
     else:
         img_width = 0
         img_height = 0
+
+    if args.standardize:
+        # Get image standardization parameters
+        mean_std_dict = BasicDataset.get_dataset_mean_std([in_file], 
+                                                        img_width, 
+                                                        img_height, 
+                                                        args.scale, 
+                                                        use_bw=args.use_bw)
+        dataset_mean = mean_std_dict.get("mean")
+        dataset_std = mean_std_dict.get("std")
+    else:
+        dataset_mean = None
+        dataset_std = None
+
+    img = Image.open(in_file)
 
     mask = predict_img(net=net,
                         full_img=img,
@@ -93,20 +116,25 @@ if __name__ == "__main__":
                         img_height=img_height,
                         img_scale=args.scale,
                         out_threshold=args.mask_threshold,
-                        device=device)
+                        device=device,
+                        use_bw=args.use_bw,
+                        dataset_mean=dataset_mean,
+                        dataset_std=dataset_std)
 
-    image = np.array(img)
     # label image regions
     label_image = label(mask)
-
-    fig, ax = plt.subplots(figsize=(10, 6))
-    ax.imshow(image)
     
     regps = regionprops(label_image)
     max_region = max(regps, key=operator.attrgetter("area"))
     miny, minx, maxy, maxx = max_region.bbox
+
     rect = mpatches.Rectangle((minx, miny), maxx - minx, maxy - miny,
                             fill=False, edgecolor='red', linewidth=1)
+    image = np.array(img)
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.imshow(image)
+    
     ax.add_patch(rect)
 
     ax.set_axis_off()
