@@ -66,6 +66,8 @@ if __name__ == "__main__":
                         help='Size images should be resized to, in format: NxM. Example: 24x24')
     parser.add_argument('--bw', dest='use_bw', action='store_true',
                         help='Use black-white images')
+    parser.add_argument('--standardize', dest='standardize', action='store_true',
+                        help='Standardize images based on dataset mean and std values')
 
     args = parser.parse_args()
     in_file = args.input
@@ -90,14 +92,18 @@ if __name__ == "__main__":
         img_width = 0
         img_height = 0
 
-    # Get image standardization parameters
-    mean_std_dict = BasicDataset.get_dataset_mean_std([in_file], 
-                                                      img_width, 
-                                                      img_height, 
-                                                      args.scale, 
-                                                      use_bw=args.use_bw)
-    dataset_mean = mean_std_dict.get("mean")
-    dataset_std = mean_std_dict.get("std")
+    if args.standardize:
+        # Get image standardization parameters
+        mean_std_dict = BasicDataset.get_dataset_mean_std([in_file], 
+                                                        img_width, 
+                                                        img_height, 
+                                                        args.scale, 
+                                                        use_bw=args.use_bw)
+        dataset_mean = mean_std_dict.get("mean")
+        dataset_std = mean_std_dict.get("std")
+    else:
+        dataset_mean = None
+        dataset_std = None
 
     img = Image.open(in_file)
 
