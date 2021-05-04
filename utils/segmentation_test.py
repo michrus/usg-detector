@@ -9,7 +9,7 @@ import os
 import sys
 import time
 from PIL import Image
-from typing import List, Union
+from typing import List, Union, Optional
 
 logging.basicConfig(format='[%(levelname)s] %(message)s')
 log = logging.getLogger(__name__)
@@ -27,7 +27,7 @@ def main() -> int:
         args = parse_args()
         if args.v:
             log.setLevel(logging.DEBUG)
-        segmentation(args.i)
+        segmentation(args.i, args.save_dir)
     except Exception as e:
         log.error(f"Fatal error: {e}")
         return_code = 255
@@ -48,6 +48,9 @@ def parse_args() -> argparse.ArgumentParser:
     parser.add_argument("-v",
                         help="Print more verbose logs output.",
                         action="store_true", required=False)
+    parser.add_argument("--save_dir",
+                        help=("Directory for visualization images.\n"),
+                        action="store", type=str, required=False)
     args = parser.parse_args()
     if not os.path.exists(args.i):
         parser.error("Input image does not exist!")
@@ -55,10 +58,13 @@ def parse_args() -> argparse.ArgumentParser:
     if os.path.isdir(args.i):
         parser.error("Path given as input image is directory!")
         sys.exit(1)
+    if args.save_dir and not os.path.exists(args.save_dir):
+        parser.error("Save directory does not exist!")
+        sys.exit(1)
 
     return args
 
-def segmentation(image_path: str) -> None:
+def segmentation(image_path: str, save_dir: Optional[str]) -> None:
     w=15
     h=15
     columns = 3
@@ -118,6 +124,12 @@ def segmentation(image_path: str) -> None:
     plt.imshow(image)
 
     log.info(f"Processing time {total_time*1000} ms")
+
+    if save_dir:
+        file_name = os.path.basename(image_path)
+        save_path = os.path.join(save_dir, file_name)
+        log.debug(f"Saving bounding box image to: {save_path}")
+        cv2.imwrite(save_path, image)
 
     plt.show()
 
