@@ -7,7 +7,7 @@ from utils.utils import coords_from_bound_rect
 
 
 def results_mean(image: np.array, ground_truth: List[Tuple[int]]):
-    raw_results = segmentation(image, ground_truth, "mean")
+    raw_results = segmentation(image, "mean")
     results = {
         "fps": metrics.fps(raw_results.get("time")),
         "iou": metrics.iou(raw_results.get("prediction"), ground_truth)

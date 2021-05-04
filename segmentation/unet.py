@@ -1,9 +1,12 @@
+import cv2
 import metrics
 import numpy as np
+import operator
 import os
 import time
 import torch
 from PIL import Image
+from skimage.measure import label, regionprops
 from third_party.pytorch_unet.unet import UNet
 from third_party.pytorch_unet.utils.dataset import BasicDataset
 from torchvision import transforms
@@ -46,35 +49,42 @@ def predict_img(net,
 
         probs = tf(probs.cpu())
         full_mask = probs.squeeze().cpu().numpy()
+    #thresholded_mask = (full_mask > out_threshold).astype(int)
     thresholded_mask = full_mask > out_threshold
+    label_image = label(thresholded_mask)
+    regps = regionprops(label_image)
+    max_region = max(regps, key=operator.attrgetter("area"))
+    miny, minx, maxy, maxx = max_region.bbox
+    box = [(minx, miny), (minx, maxy), (maxx, miny), (maxx,maxy)]
     time2 = time.time()
+
     total_time = time2 - time1
     
-    time1 = time.time()
-    edges = cv2.dilate(cv2.Canny(thresholded_mask, 0, 255), None)
-    time2 = time.time()
-    total_time = total_time + (time2 - time1)
+    # time1 = time.time()
+    # edges = cv2.dilate(cv2.Canny(thresholded_mask, 0, 255), None)
+    # time2 = time.time()
+    # total_time = total_time + (time2 - time1)
 
-    time1 = time.time()
-    contour = sorted(cv2.findContours(edges, cv2.RETR_LIST, 
-                                        cv2.CHAIN_APPROX_SIMPLE)[-2], key=cv2.contourArea)[-1]
-    time2 = time.time()
-    total_time = total_time + (time2 - time1)
+    # time1 = time.time()
+    # contour = sorted(cv2.findContours(edges, cv2.RETR_LIST, 
+    #                                     cv2.CHAIN_APPROX_SIMPLE)[-2], key=cv2.contourArea)[-1]
+    # time2 = time.time()
+    # total_time = total_time + (time2 - time1)
 
-    time1 = time.time()
-    x, y, w, h = cv2.boundingRect(contour)
-    box = coords_from_bound_rect(x, y, w, h)
-    time2 = time.time()
-    total_time = total_time + (time2 - time1)
+    # time1 = time.time()
+    # x, y, w, h = cv2.boundingRect(contour)
+    # box = coords_from_bound_rect(x, y, w, h)
+    # time2 = time.time()
+    # total_time = total_time + (time2 - time1)
 
     result = {
         "prediction": box,
         "time": total_time
     }
-    result = {
-        "prediction": [(20,20), (10,20), (20,10), (10,10)],
-        "time": 10.0
-    }
+    # result = {
+    #     "prediction": [(20,20), (10,20), (20,10), (10,10)],
+    #     "time": 10.0
+    # }
 
     return result
 
