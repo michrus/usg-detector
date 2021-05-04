@@ -63,7 +63,7 @@ def main() -> int:
         log.info("Performing cleanup.")
         script_directory = os.path.dirname(os.path.realpath(__file__))
         model_path = os.path.join(script_directory, weights_file_name)
-        shutil.rmtree(model_path)
+        os.remove(model_path)
     return return_code
 
 def parse_args() -> argparse.ArgumentParser:
