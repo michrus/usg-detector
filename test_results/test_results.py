@@ -5,6 +5,8 @@ import logging
 import numpy as np
 import os
 import segmentation.classic
+import segmentation.unet
+import shutil
 import sys
 from os.path import join
 from PIL import Image
@@ -19,10 +21,13 @@ log.setLevel(logging.INFO)
 TASK_METHODS_MAPPING: Dict[str, List[str]] = {
     "segmentation": {
         "classic_mean_threshold": segmentation.classic.results_mean,
-        "classic_otsu_threshold": segmentation.classic.results_otsu
+        "classic_otsu_threshold": segmentation.classic.results_otsu,
+        "unet": segmentation.unet.unet
     }
 }
 AVAILABLE_METHODS = [method for methods in TASK_METHODS_MAPPING.values() for method in methods]
+MACHINE_LEARNING_METHODS = ["unet"]
+weights_file_name = "model.pth"
 
 def main() -> int:
     """
@@ -43,6 +48,7 @@ def main() -> int:
     methods = [args.method] if args.method is not list else args.method
     if "all" in methods:
         methods = AVAILABLE_METHODS
+    cleanup_flag = manage_weights_file(args.weights, methods)
     labels = get_labels(args.labels)
     per_image_results = get_per_image_results(args.images, labels, image_tasks, methods)
     # import pprint
@@ -53,6 +59,11 @@ def main() -> int:
     #     log.error(f"Fatal error: {e}")
     #     return_code = 255
     log.info("Script finished working.")
+    if cleanup_flag:
+        log.info("Performing cleanup.")
+        script_directory = os.path.dirname(os.path.realpath(__file__))
+        model_path = os.path.join(script_directory, weights_file_name)
+        shutil.rmtree(model_path)
     return return_code
 
 def parse_args() -> argparse.ArgumentParser:
@@ -78,7 +89,7 @@ def parse_args() -> argparse.ArgumentParser:
                         nargs="?", choices=["all", *AVAILABLE_METHODS], 
                         default="all", type=str, required=False)
     parser.add_argument("--weights", "-w",
-                        help=("Path to weights directory for machine learning methods.\n"),
+                        help=("Path to weights file for machine learning methods.\n"),
                         action="store", type=str, required=False)    
     parser.add_argument("--verbose", "-v",
                         help="Print more verbose logs output.",
@@ -93,6 +104,9 @@ def parse_args() -> argparse.ArgumentParser:
     if not os.path.exists(args.images):
         parser.error("Input directory does not exist!")
         sys.exit(1)
+    if not os.path.exists(args.weights):
+        parser.error("Path to weights file does not exist!")
+        sys.exit(1)
     if not os.path.exists(args.labels):
         parser.error("Labels file does not exist!")
         sys.exit(1)
@@ -101,6 +115,36 @@ def parse_args() -> argparse.ArgumentParser:
         sys.exit(1)
 
     return args
+
+def manage_weights_file(path_to_weights, used_methods) -> bool:
+    cleanup_flag = False
+    if any(method in MACHINE_LEARNING_METHODS for method in used_methods):
+        script_directory = os.path.dirname(os.path.realpath(__file__))
+        destination_weights_path = os.path.join(script_directory, weights_file_name)
+        if path_to_weights:
+            # check if it's not the same weights as those present in directory
+            path_to_weights_realpath = os.path.realpath(path_to_weights)
+            if path_to_weights_realpath == destination_weights_path:
+                log.warning("Path to weights given as parameter points to model.pth in script directory. This is redundant.")
+            # check if model.pth is already present in script directory
+            if os.path.exists(destination_weights_path):
+                message = ("Weights parameter was given but model.pth already exists in script directory. ",
+                        "Please, move the file or execute the script without --weights/-w argument.")
+                log.error(message)
+                sys.exit(1)
+            # copy weights from path given as parameter to model.pth in script directory
+            shutil.copy(path_to_weights_realpath, destination_weights_path)
+            cleanup_flag = True
+        
+        if not os.path.exists(destination_weights_path):
+            message = ("No weights file. Please either run the script with --weights/-w parameter ",
+                       "pointing to weights file or save the weights as model.pth in script directory.")
+            log.error(message)
+            sys.exit(1)
+    else:
+        log.debug("Machine learning methods are not used. Weights parameter irrelevant.")
+
+    return cleanup_flag
 
 def get_labels(labels_path: str) -> List[Dict[str, str]]:
     log.info(f"Reading labels file: {labels_path}")
