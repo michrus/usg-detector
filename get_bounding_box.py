@@ -67,6 +67,9 @@ if __name__ == "__main__":
                         help='Downscaling factor of the images. Takes priority over resize')
     parser.add_argument('-r', '--resize', dest='resize_string', type=str,
                         help='Size images should be resized to, in format: NxM. Example: 24x24')
+    parser.add_argument('--autoscale', dest='autoscale_string', type=str,
+                        help=('Automatically set scale to scale to original dimensions model was trained, retaining dimension relations. '
+                              'Example --autoscale=560x360 where 560x360 is original size. Passing this arguments overrides --resize and --scale.'))
     parser.add_argument('--bw', dest='use_bw', action='store_true',
                         help='Use black-white images')
     parser.add_argument('--standardize', dest='standardize', action='store_true',
@@ -87,7 +90,20 @@ if __name__ == "__main__":
     state_dict = torch.load(args.model, map_location=device)
     net.load_state_dict(state_dict)
 
-    if args.resize_string:
+    img = Image.open(in_file)
+
+    scale = args.scale
+
+    if args.autoscale_string:
+        original_dimensions = list(map(int, args.autoscale_string.split("x")))
+        original_width = original_dimensions[0]
+        original_height = original_dimensions[1]
+        img_width = 0
+        img_height = 0
+        scale = (original_width * original_height) / (img.width * img.height)
+        # clip scale at 1.0
+        scale = 1.0 if scale > 1.0 else scale
+    elif args.resize_string:
         resize = list(map(int, args.resize_string.split("x")))
         img_width = resize[0]
         img_height = resize[1]
@@ -108,13 +124,11 @@ if __name__ == "__main__":
         dataset_mean = None
         dataset_std = None
 
-    img = Image.open(in_file)
-
     mask = predict_img(net=net,
                         full_img=img,
                         img_width=img_width,
                         img_height=img_height,
-                        img_scale=args.scale,
+                        img_scale=scale,
                         out_threshold=args.mask_threshold,
                         device=device,
                         use_bw=args.use_bw,
